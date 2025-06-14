@@ -1,0 +1,17 @@
+{
+    "admin": {
+        "password": "password123",
+        "email": "admin@example.com",
+        "created_at": "2025-06-14 12:31:10"
+    },
+    "user1": {
+        "password": "mypass",
+        "email": "user1@example.com",
+        "created_at": "2025-06-14 12:31:10"
+    },
+    "test": {
+        "password": "12345678",
+        "email": "allendavid214@gmail.com",
+        "created_at": "2025-06-14 12:31:33"
+    }
+}
