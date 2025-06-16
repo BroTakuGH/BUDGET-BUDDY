@@ -631,4 +631,8 @@ $show_login = !$show_register || isset($register_success);
         </div>
     </div>
 </body>
+
+
+ 
+</script>
 </html>
