@@ -2,35 +2,35 @@
 include("config.php");
 include("firebaseRDB.php");
 
-$name =$_POST['name'];
-$email=$_POST['email'];
-$password=$_POST['password'];
+$name = $_POST['name'];
+$email = $_POST['email'];
+$password = $_POST['password'];
 
-if($name == ""){
+if ($name == "") {
     echo "Name is required";
-}else if($email == ""){
+} else if ($email == "") {
     echo "Email is required";
-}else if($password == ""){
+} else if ($password == "") {
     echo "Password is required";
-}else{
+} else {
     $rdb = new firebaseRDB($databaseURL);
-    $retrieve = $rdb->retrieve("/user","email","EQUAL", $email,);
-    $data = json_decode($retrieve, 1);
+    $retrieve = $rdb->retrieve("/user", "email", "EQUAL", $email);
+    $data = json_decode($retrieve, true);
 
-    if(count($data)>0){
+    if (count($data) > 0) {
         echo "Email already registered";
-    }else{
-        $insert = $rdb->insert("/user",[
+    } else {
+        $insert = $rdb->insertWithIncrement("user", [
             "name" => $name,
-            "email"=> $email,
-            "password"=> $password
+            "email" => $email,
+            "password" => $password
         ]);
 
-        $result = json_decode($insert);
-        if(isset($result['name'])){
+        $result = json_decode($insert, true);
+        if (is_array($result)) {
             echo "Signup success, please login";
-        }else{
-            echo "Sigup failed";
+        } else {
+            echo "Signup failed";
         }
     }
 }
