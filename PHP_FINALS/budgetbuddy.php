@@ -2,7 +2,7 @@
 session_start();
 include("config.php");
 include("firebaseRDB.php");
-
+$db = new firebaseRDB($databaseURL);
 // Simple user storage (in production, use a database)
 // Initialize users file storage
 $users_file = 'users.json';
@@ -75,17 +75,18 @@ if (isset($_POST['register'])) {
     }
     
     if (empty($register_errors)) {
-        // Register the user
-        $users[$username] = [
-            'password' => $password, // In production, hash this password
-            'email' => $email,
-            'created_at' => date('Y-m-d H:i:s')
-        ];
-        
-        file_put_contents($users_file, json_encode($users, JSON_PRETTY_PRINT));
-        $register_success = "Account created successfully! You can now login.";
-        $show_login = true;
-    }
+    // Register to Firebase
+    $db->insert("users", [
+        'username' => $username,
+        'password' => $password,
+        'email' => $email,
+        'created_at' => date('Y-m-d H:i:s')
+    ]);
+    
+    $register_success = "Account created successfully! You can now login.";
+    $show_login = true;
+}
+
 }
 
 // Handle login
@@ -123,12 +124,14 @@ if (isset($_POST['add_bill']) && $_SESSION['logged_in']) {
     $bill_amount = floatval($_POST['bill_amount']);
     
     if (!empty($bill_name) && $bill_amount > 0) {
-        $_SESSION['bills'][] = [
-            'name' => $bill_name,
-            'amount' => $bill_amount,
-            'date_added' => date('Y-m-d H:i:s')
-        ];
-        $success_message = "Bill added successfully!";
+    $bill_data = [
+        'name' => $bill_name,
+        'amount' => $bill_amount,
+        'date_added' => date('Y-m-d H:i:s')
+    ];
+
+    $db->insert("users/{$_SESSION['username']}/bills", $bill_data);
+    $success_message = "Bill added successfully!";
     } else {
         $error_message = "Please enter valid bill name and amount!";
     }
@@ -145,12 +148,11 @@ if (isset($_POST['set_income']) && $_SESSION['logged_in']) {
 
 // Handle deleting bills
 if (isset($_POST['delete_bill']) && $_SESSION['logged_in']) {
-    $bill_index = intval($_POST['bill_index']);
-    if (isset($_SESSION['bills'][$bill_index])) {
-        unset($_SESSION['bills'][$bill_index]);
-        $_SESSION['bills'] = array_values($_SESSION['bills']); // Reindex array
-        $delete_success = "Bill deleted successfully!";
-    }
+    $bill_id = $_POST['bill_id'];
+
+    $db->delete("users/$username/bills", $bill_id);
+
+    $delete_success = "Bill deleted successfully!";
 }
 
 // Calculate totals
