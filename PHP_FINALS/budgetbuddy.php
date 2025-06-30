@@ -8,6 +8,7 @@ $db = new firebaseRDB($databaseURL);
 
 $users_data = $db->retrieve("users");
 $users_raw = json_decode($users_data, true) ?? [];
+
 // Initialize session variables
 
 // Handle registration
@@ -118,7 +119,8 @@ if (isset($_POST['add_bill']) && $_SESSION['logged_in']) {
         $db = new firebaseRDB($databaseURL);
 
         // Get existing bills
-        $bills_data = $db->retrieve("users/$username/bills");
+        $user_firebase_id = $_SESSION['firebase_id'] ?? null;
+        $bills_data = $db->retrieve("users/$user_firebase_id/bills");
         $bills = json_decode($bills_data, true);
 
         // Determine next ID
@@ -137,7 +139,8 @@ if (isset($_POST['add_bill']) && $_SESSION['logged_in']) {
             'date_added' => date('Y-m-d H:i:s')
         ];
 
-        $insert_result = $db->insertWithCustomKey("users/$username/bills", $bill_id, $new_bill);
+        $user_firebase_id = $_SESSION['firebase_id'] ?? null;
+        $insert_result = $db->insertWithCustomKey("users/$user_firebase_id/bills", $bill_id, $new_bill);
 
         // Feedback
         if (strpos($insert_result, 'error') === false) {
@@ -155,6 +158,7 @@ if (isset($_POST['set_income']) && $_SESSION['logged_in']) {
     $income = floatval($_POST['monthly_income']);
     if ($income >= 0) {
         $_SESSION['monthly_income'] = $income;
+        
         $income_success = "Monthly income updated successfully!";
     }
 }
@@ -162,8 +166,25 @@ if (isset($_POST['set_income']) && $_SESSION['logged_in']) {
 // Handle deleting bills
 if (isset($_POST['delete_bill']) && $_SESSION['logged_in']) {
     $bill_id = $_POST['bill_id'];
-    $db->delete("users/{$_SESSION['username']}/bills", $bill_id);
-    $delete_success = "Bill deleted successfully!";
+
+    $username = $_SESSION['username'];
+    $users_data = $db->retrieve("users");
+    $users_raw = json_decode($users_data, true) ?? [];
+
+    $user_firebase_id = null;
+    foreach ($users_raw as $key => $user_info) {
+        if ($user_info['username'] === $username) {
+            $user_firebase_id = $key;
+            break;
+        }
+    }
+
+    if ($user_firebase_id) {
+        $db->delete("users/$user_firebase_id/bills", $bill_id);
+        $delete_success = "Bill deleted successfully!";
+    } else {
+        $delete_error = "Unable to locate user ID. Deletion failed.";
+    }
 }
 
 // Calculate totals
@@ -562,7 +583,7 @@ $show_login = !$show_register || isset($register_success);
                             <?php
                                 $username = $_SESSION['username'];
                                 $created_at = isset($users[$username]['created_at']) ? $users[$username]['created_at'] : null;?>
-                            
+                                
                             <?php
                             $username = $_SESSION['username'];
                             $users_data = $db->retrieve("users");
@@ -610,24 +631,41 @@ $show_login = !$show_register || isset($register_success);
                 <?php endif; ?>
                 
                 <!-- Summary Card -->
+<?php
+$total_bills = 0;
+
+
+$bills_data = $db->retrieve("users/$firebase_id/bills");
+$bills = json_decode($bills_data, true) ?? [];
+
+
+foreach ($bills as $bill) {
+    $total_bills += floatval($bill['amount']);
+}
+
+
+$remaining_income = $_SESSION['monthly_income'] - $total_bills;
+$remaining_class = $remaining_income >= 0 ? 'positive' : 'negative';
+
+?>
                 <div class="dashboard">
                     <div class="card summary">
-                        <h3>💼 Monthly Financial Summary</h3>
-                        <div class="summary-item">
-                            <h4>Monthly Income</h4>
-                            <div class="amount">$<?php echo number_format($_SESSION['monthly_income'], 2); ?></div>
-                        </div>
-                        <div class="summary-item">
-                            <h4>Total Bills</h4>
-                            <div class="amount">$<?php echo number_format($total_bills, 2); ?></div>
-                        </div>
-                        <div class="summary-item">
-                            <h4>Remaining</h4>
-                            <div class="amount <?php echo $remaining_income = $_SESSION['monthly_income'] - $total_bills; ?>">
-                                $<?php echo number_format($remaining_income, 2); ?>
-                            </div>
-                        </div>
-                    </div>
+    <h3>💼 Monthly Financial Summary</h3>
+    <div class="summary-item">
+        <h4>Monthly Income</h4>
+        <div class="amount">$<?php echo number_format($_SESSION['monthly_income'], 2); ?></div>
+    </div>
+    <div class="summary-item">
+        <h4>Total Bills</h4>
+        <div class="amount">$<?php echo number_format($total_bills, 2); ?></div>
+    </div>
+    <div class="summary-item">
+        <h4>Remaining</h4>
+        <div class="amount <?php echo $remaining_class; ?>">
+            $<?php echo number_format($remaining_income, 2); ?>
+        </div>
+    </div>
+</div>
                     
                     <!-- Set Income -->
                     <div class="card">
@@ -662,29 +700,29 @@ $show_login = !$show_register || isset($register_success);
                     
                     <!-- Bills List -->
                     <div class="card">
-                        <h3>📋 Your Monthly Bills</h3>
-                        <?php if (empty($_SESSION['bills'])): ?>
-                            <p style="color: #666; text-align: center; padding: 20px;">No bills added yet. Add your first bill above!</p>
-                        <?php else: ?>
-                            <div class="bills-list">
-                                <?php foreach ($bills as $bill_id => $bill) : ?>
-                                    <div class="bill-item">
-                                        <div class="bill-info">
-                                            <div class="bill-name"><?php echo htmlspecialchars($bill['name']); ?></div>
-                                            <div class="bill-amount">$<?php echo number_format($bill['amount'], 2); ?></div>
-                                        </div>
-                                        <form method="POST" style="display: inline;">
-                                            <input type="hidden" name="bill_id" value="<?php echo htmlspecialchars($bill_id); ?>">
-                                            <button type="submit" name="delete_bill" class="btn btn-danger btn-small" 
-                                                    onclick="return confirm('Are you sure you want to delete this bill?')">
-                                                Delete
-                                            </button>
-                                        </form>
-                                    </div>
-                                <?php endforeach; ?>
-                            </div>
-                        <?php endif; ?>
+    <h3>📋 Your Monthly Bills</h3>
+    <?php if (empty($bills)): ?>
+        <p style="color: #666; text-align: center; padding: 20px;">No bills added yet. Add your first bill above!</p>
+    <?php else: ?>
+        <div class="bills-list">
+            <?php foreach ($bills as $bill_id => $bill) : ?>
+                <div class="bill-item">
+                    <div class="bill-info">
+                        <div class="bill-name"><?php echo htmlspecialchars($bill['name']); ?></div>
+                        <div class="bill-amount">$<?php echo number_format($bill['amount'], 2); ?></div>
                     </div>
+                    <form method="POST" style="display: inline;">
+                        <input type="hidden" name="bill_id" value="<?php echo htmlspecialchars($bill_id); ?>">
+                        <button type="submit" name="delete_bill" class="btn btn-danger btn-small" 
+                                onclick="return confirm('Are you sure you want to delete this bill?')">
+                            Delete
+                        </button>
+                    </form>
+                </div>
+            <?php endforeach; ?>
+        </div>
+    <?php endif; ?>
+</div>
                 </div>
             <?php endif; ?>
         </div>
