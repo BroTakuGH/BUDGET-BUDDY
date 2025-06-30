@@ -5,32 +5,10 @@ include("firebaseRDB.php");
 $db = new firebaseRDB($databaseURL);
 // Simple user storage (in production, use a database)
 // Initialize users file storage
-$users_file = 'users.json';
-if (!file_exists($users_file)) {
-    $users = [
-        'admin' => [
-            'password' => 'password123',
-            'email' => 'admin@example.com',
-            'created_at' => date('Y-m-d H:i:s')
-        ],
-        'user1' => [
-            'password' => 'mypass',
-            'email' => 'user1@example.com',
-            'created_at' => date('Y-m-d H:i:s')
-        ]
-    ];
-    file_put_contents($users_file, json_encode($users, JSON_PRETTY_PRINT));
-} else {
-    $users = json_decode(file_get_contents($users_file), true);
-}
+
 
 // Initialize session variables
-if (!isset($_SESSION['bills'])) {
-    $_SESSION['bills'] = [];
-}
-if (!isset($_SESSION['monthly_income'])) {
-    $_SESSION['monthly_income'] = 0;
-}
+
 
 // Handle registration
 if (isset($_POST['register'])) {
@@ -76,15 +54,16 @@ if (isset($_POST['register'])) {
     
     if (empty($register_errors)) {
     // Register to Firebase
-    $db->insert("users", [
+   $nextUserID = $db->getNextID("counters/users");
+    $customUserKey = "user" . $nextUserID;
+
+    $db->insertWithCustomKey("users", $customUserKey, [
         'username' => $username,
         'password' => $password,
         'email' => $email,
-        'created_at' => date('Y-m-d H:i:s')
+        'created_at' => date('Y-m-d H:i:s'),
+        'user_id' => $customUserKey
     ]);
-    
-    $register_success = "Account created successfully! You can now login.";
-    $show_login = true;
 }
 
 }
@@ -122,16 +101,39 @@ if (isset($_POST['logout'])) {
 if (isset($_POST['add_bill']) && $_SESSION['logged_in']) {
     $bill_name = trim($_POST['bill_name']);
     $bill_amount = floatval($_POST['bill_amount']);
-    
-    if (!empty($bill_name) && $bill_amount > 0) {
-    $bill_data = [
-        'name' => $bill_name,
-        'amount' => $bill_amount,
-        'date_added' => date('Y-m-d H:i:s')
-    ];
 
-    $db->insert("users/{$_SESSION['username']}/bills", $bill_data);
-    $success_message = "Bill added successfully!";
+    if (!empty($bill_name) && $bill_amount > 0) {
+        $username = $_SESSION['username'];
+        $db = new firebaseRDB($databaseURL);
+
+        // Get existing bills
+        $bills_data = $db->retrieve("users/$username/bills");
+        $bills = json_decode($bills_data, true);
+
+        // Determine next ID
+        $next_index = 1;
+        if (is_array($bills)) {
+            while (isset($bills["bill" . $next_index])) {
+                $next_index++;
+            }
+        }
+        $bill_id = "bill" . $next_index;
+
+        // Insert the new bill
+        $new_bill = [
+            'name' => $bill_name,
+            'amount' => $bill_amount,
+            'date_added' => date('Y-m-d H:i:s')
+        ];
+
+        $insert_result = $db->insertWithCustomKey("users/$username/bills", $bill_id, $new_bill);
+
+        // Feedback
+        if (strpos($insert_result, 'error') === false) {
+            $success_message = "Bill added successfully!";
+        } else {
+            $error_message = "Failed to add bill.";
+        }
     } else {
         $error_message = "Please enter valid bill name and amount!";
     }
@@ -149,20 +151,21 @@ if (isset($_POST['set_income']) && $_SESSION['logged_in']) {
 // Handle deleting bills
 if (isset($_POST['delete_bill']) && $_SESSION['logged_in']) {
     $bill_id = $_POST['bill_id'];
-
-    $db->delete("users/$username/bills", $bill_id);
-
+    $db->delete("users/{$_SESSION['username']}/bills", $bill_id);
     $delete_success = "Bill deleted successfully!";
 }
 
 // Calculate totals
+// Retrieve bills from Firebase
+$username = $_SESSION['username'];
+$bills_data = $db->retrieve("users/$username/bills");
+$bills = json_decode($bills_data, true) ?? [];
+
 $total_bills = 0;
-if (isset($_SESSION['bills'])) {
-    foreach ($_SESSION['bills'] as $bill) {
-        $total_bills += $bill['amount'];
-    }
+foreach ($bills as $bill) {
+    $total_bills += floatval($bill['amount']);
 }
-$remaining_income = $_SESSION['monthly_income'] - $total_bills;
+
 
 // Determine which form to show
 $show_register = isset($_GET['register']) || (isset($_POST['register']) && !empty($register_errors));
@@ -568,7 +571,7 @@ $show_login = !$show_register || isset($register_success);
                         </div>
                         <div class="summary-item">
                             <h4>Remaining</h4>
-                            <div class="amount <?php echo $remaining_income >= 0 ? 'positive' : 'negative'; ?>">
+                            <div class="amount <?php echo $remaining_income = $_SESSION['monthly_income'] - $total_bills; ?>">
                                 $<?php echo number_format($remaining_income, 2); ?>
                             </div>
                         </div>
@@ -612,14 +615,14 @@ $show_login = !$show_register || isset($register_success);
                             <p style="color: #666; text-align: center; padding: 20px;">No bills added yet. Add your first bill above!</p>
                         <?php else: ?>
                             <div class="bills-list">
-                                <?php foreach ($_SESSION['bills'] as $index => $bill): ?>
+                                <?php foreach ($bills as $bill_id => $bill) : ?>
                                     <div class="bill-item">
                                         <div class="bill-info">
                                             <div class="bill-name"><?php echo htmlspecialchars($bill['name']); ?></div>
                                             <div class="bill-amount">$<?php echo number_format($bill['amount'], 2); ?></div>
                                         </div>
                                         <form method="POST" style="display: inline;">
-                                            <input type="hidden" name="bill_index" value="<?php echo $index; ?>">
+                                            <input type="hidden" name="bill_id" value="<?php echo htmlspecialchars($bill_id); ?>">
                                             <button type="submit" name="delete_bill" class="btn btn-danger btn-small" 
                                                     onclick="return confirm('Are you sure you want to delete this bill?')">
                                                 Delete

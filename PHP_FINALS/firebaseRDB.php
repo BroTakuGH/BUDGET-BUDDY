@@ -1,9 +1,4 @@
 <?php
-/*
- * class name: firebaseRDB
- * version: 1.1
- * author: Devisty (modified by ChatGPT)
- */
 
 class firebaseRDB {
     private $url;
@@ -73,7 +68,7 @@ class firebaseRDB {
         return $grab;
     }
 
-    private function getNextID($counterPath) {
+    public function getNextID($counterPath) {
         $path = $this->url . "/$counterPath.json";
         $current = $this->grab($path, "GET");
         $current = json_decode($current, true);
@@ -85,5 +80,10 @@ class firebaseRDB {
 
         return (string)$nextID;
     }
+
+    public function insertWithCustomKey($table, $customKey, $data) {
+    $path = $this->url . "/$table/$customKey.json";
+    return $this->grab($path, "PUT", json_encode($data));
+}
 }
 ?>
