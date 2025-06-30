@@ -1,5 +1,7 @@
 <?php
 session_start();
+include("config.php");
+include("firebaseRDB.php");
 
 // Simple user storage (in production, use a database)
 // Initialize users file storage
