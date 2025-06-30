@@ -27,7 +27,7 @@ if ($email == "") {
         $user = reset($data); // Safely get the first user record
         if (isset($user['password']) && $user['password'] == $password) {
             $_SESSION['user'] = $user;
-            header("location: dashboard/php");
+            header("location: dashboard.php");
         } else {
             echo "Login failed";
         }
