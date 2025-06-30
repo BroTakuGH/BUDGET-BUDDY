@@ -1,14 +1,14 @@
 <?php
-session_start();
+
 include("config.php");
 include("firebaseRDB.php");
 $db = new firebaseRDB($databaseURL);
 // Simple user storage (in production, use a database)
 // Initialize users file storage
 
-
+$users_data = $db->retrieve("users");
+$users_raw = json_decode($users_data, true) ?? [];
 // Initialize session variables
-
 
 // Handle registration
 if (isset($_POST['register'])) {
@@ -70,22 +70,33 @@ if (isset($_POST['register'])) {
 
 // Handle login
 if (isset($_POST['login'])) {
-    $username = $_POST['username'];
-    $password = $_POST['password'];
-    
-    if (isset($users[$username]) && $users[$username]['password'] === $password) {
-        $_SESSION['logged_in'] = true;
-        $_SESSION['username'] = $username;
-        $_SESSION['user_email'] = $users[$username]['email'];
-        
-        // Initialize user-specific data
-        if (!isset($_SESSION['bills'])) {
-            $_SESSION['bills'] = [];
+    $input_username = $_POST['username'];
+    $input_password = $_POST['password'];
+
+    $found = false;
+
+    foreach ($users_raw as $firebase_id => $user_data) {
+        if (
+            isset($user_data['username'], $user_data['password']) &&
+            $user_data['username'] === $input_username &&
+            $user_data['password'] === $input_password
+        ) {
+            $_SESSION['logged_in'] = true;
+            $_SESSION['username'] = $user_data['username'];
+            $_SESSION['user_email'] = $user_data['email'];
+            $_SESSION['created_at'] = $user_data['created_at'];
+            $_SESSION['firebase_id'] = $firebase_id;
+
+            if (!isset($_SESSION['monthly_income'])) {
+                $_SESSION['monthly_income'] = 0;
+            }
+
+            $found = true;
+            break;
         }
-        if (!isset($_SESSION['monthly_income'])) {
-            $_SESSION['monthly_income'] = 0;
-        }
-    } else {
+    }
+
+    if (!$found) {
         $login_error = "Invalid username or password!";
     }
 }
@@ -157,14 +168,31 @@ if (isset($_POST['delete_bill']) && $_SESSION['logged_in']) {
 
 // Calculate totals
 // Retrieve bills from Firebase
-$username = $_SESSION['username'];
-$bills_data = $db->retrieve("users/$username/bills");
-$bills = json_decode($bills_data, true) ?? [];
-
+$username = $_SESSION['username'] ?? null;
+$user_firebase_id = $users[$username]['firebase_id'] ?? null;
+$bills = [];
 $total_bills = 0;
-foreach ($bills as $bill) {
-    $total_bills += floatval($bill['amount']);
+
+if ($username && $user_firebase_id) {
+    if (isset($_POST['set_income']) && $_SESSION['logged_in']) {
+    $income = floatval($_POST['monthly_income']);
+    if ($income >= 0) {
+        $_SESSION['monthly_income'] = $income;
+        $firebase_id = $_SESSION['firebase_id']; // this must be set during login
+        $db->update("users", $firebase_id, ["monthly_income" => $income]);
+        $income_success = "Monthly income updated successfully!";
+    }
 }
+
+}
+    $bills_data = $db->retrieve("users/$user_firebase_id/bills");
+    $bills = json_decode($bills_data, true) ?? [];
+
+    foreach ($bills as $bill) {
+        $total_bills += floatval($bill['amount']);
+    }
+
+
 
 
 // Determine which form to show
@@ -531,8 +559,32 @@ $show_login = !$show_register || isset($register_success);
                     <div>
                         <span>Welcome, <strong><?php echo htmlspecialchars($_SESSION['username']); ?></strong>!</span>
                         <div class="user-details">
+                            <?php
+                                $username = $_SESSION['username'];
+                                $created_at = isset($users[$username]['created_at']) ? $users[$username]['created_at'] : null;?>
+                            
+                            <?php
+                            $username = $_SESSION['username'];
+                            $users_data = $db->retrieve("users");
+                            $users_raw = json_decode($users_data, true) ?? [];
+                            $firebase_id = null;
+                            $created_at = null;
+                          foreach ($users_raw as $key => $info) {
+                                if (isset($info['username']) && $info['username'] === $username) {
+                                $firebase_id = $key;
+                                $created_at = isset($info['created_at']) ? $info['created_at'] : null;
+
+        
+                                if (!isset($_SESSION['firebase_id'])) {
+                                 $_SESSION['firebase_id'] = $firebase_id;
+                                }
+
+                                break;
+                                }
+                            }
+                            ?>
                             <?php echo htmlspecialchars($_SESSION['user_email']); ?> • 
-                            Member since <?php echo date('M Y', strtotime($users[$_SESSION['username']]['created_at'])); ?>
+                            Member since <?php echo $created_at ? date('M Y', strtotime($created_at)) : 'N/A'; ?>
                         </div>
                     </div>
                     <form method="POST" style="display: inline;">
