@@ -46,7 +46,7 @@ if (isset($_POST['register'])) {
     }
     
     // Check if email already exists
-    foreach ($users as $user_data) {
+    foreach ($users_raw as $user_data) {
         if ($user_data['email'] === $email) {
             $register_errors[] = "Email already registered";
             break;
@@ -544,7 +544,7 @@ $show_login = !$show_register || isset($register_success);
                     <!-- Login Form -->
                     <div class="auth-form">
                         <h2>Login to Your Account</h2>
-                        <p style="margin: 20px 0; color: #666;">Demo accounts: admin/password123 or user1/mypass</p>
+                        
                         
                         <?php if (isset($register_success)): ?>
                             <div class="alert alert-success"><?php echo $register_success; ?></div>
