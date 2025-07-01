@@ -730,6 +730,84 @@ $remaining_class = $remaining_income >= 0 ? 'positive' : 'negative';
                             <button type="submit" name="add_bill" class="btn">Add Bill</button>
                         </form>
                     </div>
+                    <!-- Add Grocery -->
+                    <div class="card">
+                       <?php
+$searchTerm = $_POST['q'] ?? '';
+
+?>
+
+<h3>📄 GROCERY</h3>
+<h1>Search Products</h1>
+
+<form method="POST">
+    <input type="text" name="q" placeholder="Enter search term" value="<?php echo htmlspecialchars($searchTerm); ?>" required />
+    <button type="submit">Search</button>
+</form>
+
+<?php
+if ($searchTerm) {
+    // ✅ Corrected parameter: use 'domain' instead of 'walmart_domain'
+    $queryString = http_build_query([
+        'api_key' => '86F0B34FB70E43D4874888E5840D20AB',
+        'domain' => 'walmart.com',
+        'type' => 'search',
+        'search_term' => $searchTerm
+    ]);
+
+    $url = 'https://api.bluecartapi.com/request?' . $queryString;
+
+    // cURL call to BlueCart API
+    $ch = curl_init($url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 180);
+    $response = curl_exec($ch);
+
+    if (curl_errno($ch)) {
+        echo '<p>Error: ' . curl_error($ch) . '</p>';
+    }
+
+    curl_close($ch);
+
+    // Decode API response
+    $data = json_decode($response, true);
+
+    // ✅ Display items if available
+    if (!$data || !isset($data['search_results']) || empty($data['search_results'])) {
+    echo '<p>No products found for "' . htmlspecialchars($searchTerm) . '".</p>';
+} else {
+    echo '<h2>Results for "' . htmlspecialchars($searchTerm) . '"</h2>';
+
+    // 🔽 Scrollable Box Start
+    echo '<div style="max-height:400px; overflow-y:auto; border:1px solid #ccc; padding:10px; border-radius:10px; background:#f9f9f9;">';
+    echo '<ul style="list-style:none; padding:0; margin:0;">';
+
+    foreach ($data['search_results'] as $item) {
+        $product = $item['product'] ?? [];
+        $title = htmlspecialchars($product['title'] ?? 'No title');
+        $price = $item['offers']['primary']['price'] ?? 'No price';
+        $link = htmlspecialchars($product['link'] ?? '#');
+        $image = htmlspecialchars($product['main_image'] ?? '');
+
+        echo '<li style="margin-bottom:20px; display:flex; align-items:center;">';
+        if ($image) {
+            echo "<a href=\"$link\" target=\"_blank\"><img src=\"$image\" alt=\"$title\" style=\"width:100px; height:auto; margin-right:15px; border:1px solid #ccc; padding:3px;\" /></a>";
+        }
+        echo "<div><a href=\"$link\" target=\"_blank\" style=\"font-weight:bold; font-size:1.1em; text-decoration:none; color:#333;\">$title</a><br />";
+        echo "Price: $" . htmlspecialchars($price) . "</div>";
+        echo '</li>';
+    }
+
+    echo '</ul>';
+    echo '</div>'; // 🔽 Scrollable Box End
+}
+
+}
+?>
+    </div>
                     
                   
 
