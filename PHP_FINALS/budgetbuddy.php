@@ -341,6 +341,13 @@ $show_login = !$show_register || isset($register_success);
             border-radius: 10px;
             border-left: 5px solid #4facfe;
         }
+        .cardBillList {
+            grid-column: 1 / -1;
+            background: #f8f9fa;
+            padding: 25px;
+            border-radius: 10px;
+            border-left: 5px solid #4facfe;
+        }
         
         .card h3 {
             color: #333;
@@ -379,6 +386,7 @@ $show_login = !$show_register || isset($register_success);
         }
         
         .bills-list {
+        
             max-height: 300px;
             overflow-y: auto;
         }
@@ -667,6 +675,31 @@ $remaining_class = $remaining_income >= 0 ? 'positive' : 'negative';
     </div>
 </div>
                     
+                      <!-- Bills List -->
+                    <div class="cardBillList">
+    <h3>📋 Your Monthly Bills</h3>
+    <?php if (empty($bills)): ?>
+        <p style="color: #666; text-align: center; padding: 20px;">No bills added yet. Add your first bill above!</p>
+    <?php else: ?>
+        <div class="bills-list">
+            <?php foreach ($bills as $bill_id => $bill) : ?>
+                <div class="bill-item">
+                    <div class="bill-info">
+                        <div class="bill-name"><?php echo htmlspecialchars($bill['name']); ?></div>
+                        <div class="bill-amount">$<?php echo number_format($bill['amount'], 2); ?></div>
+                    </div>
+                    <form method="POST" style="display: inline;">
+                        <input type="hidden" name="bill_id" value="<?php echo htmlspecialchars($bill_id); ?>">
+                        <button type="submit" name="delete_bill" class="btn btn-danger btn-small" 
+                                onclick="return confirm('Are you sure you want to delete this bill?')">
+                            Delete
+                        </button>
+                    </form>
+                </div>
+            <?php endforeach; ?>
+        </div>
+    <?php endif; ?>
+    </div>
                     <!-- Set Income -->
                     <div class="card">
                         <h3>💵 Set Monthly Income</h3>
@@ -698,31 +731,9 @@ $remaining_class = $remaining_income >= 0 ? 'positive' : 'negative';
                         </form>
                     </div>
                     
-                    <!-- Bills List -->
-                    <div class="card">
-    <h3>📋 Your Monthly Bills</h3>
-    <?php if (empty($bills)): ?>
-        <p style="color: #666; text-align: center; padding: 20px;">No bills added yet. Add your first bill above!</p>
-    <?php else: ?>
-        <div class="bills-list">
-            <?php foreach ($bills as $bill_id => $bill) : ?>
-                <div class="bill-item">
-                    <div class="bill-info">
-                        <div class="bill-name"><?php echo htmlspecialchars($bill['name']); ?></div>
-                        <div class="bill-amount">$<?php echo number_format($bill['amount'], 2); ?></div>
-                    </div>
-                    <form method="POST" style="display: inline;">
-                        <input type="hidden" name="bill_id" value="<?php echo htmlspecialchars($bill_id); ?>">
-                        <button type="submit" name="delete_bill" class="btn btn-danger btn-small" 
-                                onclick="return confirm('Are you sure you want to delete this bill?')">
-                            Delete
-                        </button>
-                    </form>
-                </div>
-            <?php endforeach; ?>
-        </div>
-    <?php endif; ?>
-</div>
+                  
+
+
                 </div>
             <?php endif; ?>
         </div>
