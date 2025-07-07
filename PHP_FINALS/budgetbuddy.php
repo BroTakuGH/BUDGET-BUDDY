@@ -11,6 +11,72 @@ $users_raw = json_decode($users_data, true) ?? [];
 
 // Initialize session variables
 
+// Handle Grocery add
+if (isset($_POST['submit_grocery_list']) && $_SESSION['logged_in']) {
+    $bill_amount = floatval($_POST['list_total']);
+    $user_firebase_id = $_SESSION['firebase_id'];
+
+    if ($bill_amount > 0 && !empty($user_firebase_id)) {
+        // 🔁 Step 1: Read existing bills
+        $firebase_url = "https://budgetbuddy-fa927-default-rtdb.asia-southeast1.firebasedatabase.app/users/$user_firebase_id/bills.json";
+ // <-- Replace this!
+
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $firebase_url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        $response = curl_exec($ch);
+        curl_close($ch);
+
+        $bills = json_decode($response, true);
+
+        // 🔍 Step 2: Find the highest grocery list number
+        $highest_number = 0;
+        if (is_array($bills)) {
+            foreach ($bills as $bill) {
+                if (isset($bill['name']) && preg_match('/Grocery List #(\d+)/', $bill['name'], $matches)) {
+                    $num = (int)$matches[1];
+                    if ($num > $highest_number) {
+                        $highest_number = $num;
+                    }
+                }
+            }
+        }
+
+        // 🆕 Step 3: Create the next Grocery List name
+        $next_number = $highest_number + 1;
+        $bill_name = "Grocery List #$next_number";
+
+        $new_bill = [
+            'name' => $bill_name,
+            'amount' => $bill_amount,
+            'date_added' => date('Y-m-d H:i:s')
+        ];
+
+        // 📨 Step 4: Push new bill to Firebase
+        $payload = json_encode($new_bill);
+
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $firebase_url);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
+        $result = curl_exec($ch);
+        curl_close($ch);
+
+        // ✅ Step 5: Show result
+        if ($result && strpos($result, 'name') !== false) {
+            $success_message = "$bill_name submitted successfully!";
+        } else {
+            $error_message = "Failed to submit $bill_name.";
+        }
+    } else {
+        $error_message = "Grocery list must have a valid amount and user must be logged in.";
+    }
+}
+
+
+
 // Handle registration
 if (isset($_POST['register'])) {
     $username = trim($_POST['reg_username']);
@@ -805,9 +871,11 @@ if ($searchTerm) {
         $link = htmlspecialchars($product['link'] ?? '#');
         $image = htmlspecialchars($product['main_image'] ?? '');
 
+        $jsTitle = json_encode($title);
+        $jsPrice = json_encode($price);
         echo '<li style="margin-bottom:20px; display:flex; align-items:center;">';
         if ($image) {
-            echo "<a href=\"$link\" target=\"_blank\"><img src=\"$image\" alt=\"$title\" style=\"width:100px; height:auto; margin-right:15px; border:1px solid #ccc; padding:3px;\" /></a>";
+            echo "<img src=\"$image\" alt=\"$title\" style=\"width:100px; height:auto; margin-right:15px; border:1px solid #ccc; padding:3px; cursor:pointer;\" onclick='addItemToList($jsTitle, $jsPrice)'>";
         }
         echo "<div><a href=\"$link\" target=\"_blank\" style=\"font-weight:bold; font-size:1.1em; text-decoration:none; color:#333;\">$title</a><br />";
         echo "Price: $" . htmlspecialchars($price) . "</div>";
@@ -819,8 +887,21 @@ if ($searchTerm) {
 }
 
 }
+
 ?>
+
     </div>
+    <!-- Grocery List -->
+    <div id="grocery-list" class="card">
+    <h3>🛒 Grocery List</h3>
+    <ul id="grocery-items"></ul>
+    <p>Total: $<span id="total-price">0.00</span></p>
+    <form method="POST">
+        
+         <input type="hidden" name="list_total" id="list-total-hidden" value="0">
+    <button type="submit" name="submit_grocery_list" class="btn">Submit to Monthly Bills</button>
+    </form>
+</div>
                     
                   
 
@@ -832,6 +913,23 @@ if ($searchTerm) {
 </body>
 
 
+<script>
+let groceryList = [];
+let total = 0;
+
+function addItemToList(title, price) {
+    price = parseFloat(price);
+    groceryList.push({ title, price });
+    total += price;
+
+    const list = document.getElementById("grocery-items");
+    const li = document.createElement("li");
+    li.textContent = `${title} - $${price.toFixed(2)}`;
+    list.appendChild(li);
+
+    document.getElementById("total-price").textContent = total.toFixed(2);
+    document.getElementById("list-total-hidden").value = total.toFixed(2);
+}
  
 </script>
 </html>
