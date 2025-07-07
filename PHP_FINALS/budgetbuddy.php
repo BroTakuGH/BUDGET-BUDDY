@@ -19,7 +19,14 @@ if (isset($_POST['register'])) {
     $confirm_password = $_POST['reg_confirm_password'];
     
     $register_errors = [];
-    
+    if (isset($_POST['set_income']) && $_SESSION['logged_in']) {
+    $income = floatval($_POST['monthly_income']);
+    if ($income >= 0) {
+        $_SESSION['monthly_income'] = $income;
+        
+        $income_success = "Monthly income updated successfully!";
+    }
+}
     // Validation
     if (empty($username)) {
         $register_errors[] = "Username is required";
@@ -46,7 +53,7 @@ if (isset($_POST['register'])) {
     }
     
     // Check if email already exists
-    foreach ($users as $user_data) {
+    foreach ($users_raw as $user_data) {
         if ($user_data['email'] === $email) {
             $register_errors[] = "Email already registered";
             break;
@@ -77,25 +84,25 @@ if (isset($_POST['login'])) {
     $found = false;
 
     foreach ($users_raw as $firebase_id => $user_data) {
-        if (
-            isset($user_data['username'], $user_data['password']) &&
-            $user_data['username'] === $input_username &&
-            $user_data['password'] === $input_password
-        ) {
-            $_SESSION['logged_in'] = true;
-            $_SESSION['username'] = $user_data['username'];
-            $_SESSION['user_email'] = $user_data['email'];
-            $_SESSION['created_at'] = $user_data['created_at'];
-            $_SESSION['firebase_id'] = $firebase_id;
+    if (
+        isset($user_data['username'], $user_data['password']) &&
+        $user_data['username'] === $input_username &&
+        $user_data['password'] === $input_password
+    ) {
+        $_SESSION['logged_in'] = true;
+        $_SESSION['username'] = $user_data['username'];
+        $_SESSION['user_email'] = $user_data['email'];
+        $_SESSION['created_at'] = $user_data['created_at'];
+        $_SESSION['firebase_id'] = $firebase_id;
 
-            if (!isset($_SESSION['monthly_income'])) {
-                $_SESSION['monthly_income'] = 0;
-            }
-
-            $found = true;
-            break;
+        if (!isset($_SESSION['monthly_income'])) {
+            $_SESSION['monthly_income'] = 0;
         }
+        $_SESSION['monthly_income'] = isset($user_data['monthly_income']) ? floatval($user_data['monthly_income']) : 0;
+        $found = true;
+        break;
     }
+}
 
     if (!$found) {
         $login_error = "Invalid username or password!";
@@ -154,14 +161,20 @@ if (isset($_POST['add_bill']) && $_SESSION['logged_in']) {
 }
 
 // Handle setting monthly income
+
 if (isset($_POST['set_income']) && $_SESSION['logged_in']) {
     $income = floatval($_POST['monthly_income']);
     if ($income >= 0) {
         $_SESSION['monthly_income'] = $income;
-        
+
+        // ✅ Update in Firebase
+        $firebase_id = $_SESSION['firebase_id']; // this is set during login
+        $db->update("users", $firebase_id, ["monthly_income" => $income]);
+
         $income_success = "Monthly income updated successfully!";
     }
 }
+
 
 // Handle deleting bills
 if (isset($_POST['delete_bill']) && $_SESSION['logged_in']) {
@@ -552,7 +565,7 @@ $show_login = !$show_register || isset($register_success);
                     <!-- Login Form -->
                     <div class="auth-form">
                         <h2>Login to Your Account</h2>
-                        <p style="margin: 20px 0; color: #666;">Demo accounts: admin/password123 or user1/mypass</p>
+                        
                         
                         <?php if (isset($register_success)): ?>
                             <div class="alert alert-success"><?php echo $register_success; ?></div>
