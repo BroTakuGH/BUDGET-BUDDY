@@ -126,9 +126,9 @@ if (isset($_POST['register'])) {
         }
     }
     
-    if (empty($register_errors)) {
+ if (empty($register_errors)) {
     // Register to Firebase
-   $nextUserID = $db->getNextID("counters/users");
+    $nextUserID = $db->getNextID("counters/users");
     $customUserKey = "user" . $nextUserID;
 
     $db->insertWithCustomKey("users", $customUserKey, [
@@ -138,6 +138,9 @@ if (isset($_POST['register'])) {
         'created_at' => date('Y-m-d H:i:s'),
         'user_id' => $customUserKey
     ]);
+
+    // ✅ Set registration success message
+    $register_success = "Registered successfully! You can now log in.";
 }
 
 }
